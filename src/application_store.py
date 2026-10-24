@@ -80,10 +80,18 @@ class ApplicationStore:
             else:
                 cursor = connection.execute("INSERT INTO applications(label, active) VALUES (?, 0)", (label,))
                 application_id = cursor.lastrowid
-            connection.executemany(
-                self._sql("INSERT INTO application_events(application_id, title, event_date) VALUES (?, ?, ?)"),
-                [(application_id, item["Event"], datetime.strptime(item["Date"], "%d-%m-%Y").strftime("%Y-%m-%d")) for item in timeline],
+            event_rows = [
+                (application_id, item["Event"], datetime.strptime(item["Date"], "%d-%m-%Y").strftime("%Y-%m-%d"))
+                for item in timeline
+            ]
+            insert_events = self._sql(
+                "INSERT INTO application_events(application_id, title, event_date) VALUES (?, ?, ?)"
             )
+            if self.database_url:
+                with connection.cursor() as cursor:
+                    cursor.executemany(insert_events, event_rows)
+            else:
+                connection.executemany(insert_events, event_rows)
         return application_id
 
     def save_created_events(self, application_id, created_events):
