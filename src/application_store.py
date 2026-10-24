@@ -38,7 +38,7 @@ class ApplicationStore:
 
     def create_application(self, label, timeline):
         with self._connect() as connection:
-            cursor = connection.execute("INSERT INTO applications(label, active) VALUES (?, 1)", (label,))
+            cursor = connection.execute("INSERT INTO applications(label, active) VALUES (?, 0)", (label,))
             application_id = cursor.lastrowid
             connection.executemany(
                 "INSERT INTO application_events(application_id, title, event_date) VALUES (?, ?, ?)",
@@ -86,6 +86,14 @@ class ApplicationStore:
     def get_application(self, application_id):
         applications = self.list_applications()
         return next((item for item in applications if item["id"] == application_id), None)
+
+    def get_pending_events(self, application_id):
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT id, title, event_date FROM application_events WHERE application_id = ? AND status = 'pending' ORDER BY event_date, id",
+                (application_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def set_event_status(self, event_id, status):
         with self._connect() as connection:

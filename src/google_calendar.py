@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import json
 import os.path
 from pathlib import Path
 
@@ -15,6 +16,9 @@ SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 class GoogleCalendar:
 
+    class AuthorizationRequired(RuntimeError):
+        """The hosted user must complete the configured web OAuth flow."""
+
     def __init__(self):
 
         self.service = self.authenticate()
@@ -24,8 +28,9 @@ class GoogleCalendar:
         creds = None
 
         project_root = Path(__file__).resolve().parent.parent
-        token_path = project_root / "credentials" / "token.json"
-        credentials_path = project_root / "credentials" / "credentials.json"
+        token_path = Path(os.environ.get("GOOGLE_TOKEN_PATH", project_root / "credentials" / "token.json"))
+        credentials_path = Path(os.environ.get("GOOGLE_CLIENT_SECRETS_FILE", project_root / "credentials" / "credentials.json"))
+        hosted_client = os.environ.get("GOOGLE_OAUTH_CLIENT_CONFIG")
 
         if os.path.exists(token_path):
 
@@ -41,9 +46,14 @@ class GoogleCalendar:
                     creds.refresh(Request())
                 except RefreshError:
                     # Revoked/expired refresh tokens require the user to consent again.
+                    if hosted_client:
+                        raise self.AuthorizationRequired("Google Calendar access needs to be renewed.")
                     creds = self._authorize(credentials_path)
 
             else:
+
+                if hosted_client:
+                    raise self.AuthorizationRequired("Connect Google Calendar to continue.")
 
                 if not os.path.exists(credentials_path):
                     raise RuntimeError(
@@ -52,7 +62,8 @@ class GoogleCalendar:
 
                 creds = self._authorize(credentials_path)
 
-            with open(token_path, "w") as token:
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(token_path, "w", encoding="utf-8") as token:
 
                 token.write(creds.to_json())
 
@@ -64,6 +75,16 @@ class GoogleCalendar:
     def _authorize(credentials_path):
         flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
         return flow.run_local_server(port=0, open_browser=True)
+
+    @staticmethod
+    def web_client_config():
+        raw = os.environ.get("GOOGLE_OAUTH_CLIENT_CONFIG")
+        return json.loads(raw) if raw else None
+
+    @staticmethod
+    def token_path():
+        project_root = Path(__file__).resolve().parent.parent
+        return Path(os.environ.get("GOOGLE_TOKEN_PATH", project_root / "credentials" / "token.json"))
 
     def create_event(self, title, date):
 

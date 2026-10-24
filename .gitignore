@@ -1,4 +1,6 @@
 instance/
+.env
+.env.*
 credentials/token.json
 credentials/credentials.json
 evaluation/private/

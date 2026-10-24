@@ -3,19 +3,30 @@ import os
 import hmac
 import secrets
 
-from flask import Flask, abort, render_template, request, session
+from flask import Flask, abort, redirect, render_template, request, session, url_for
 
 from src.timeline_builder import TimelineBuilder
 from src.calendar_generator import CalendarGenerator
-from src.google_calendar import GoogleCalendar
+from src.google_calendar import GoogleCalendar, SCOPES
 from src.application_store import ApplicationStore
 from googleapiclient.errors import HttpError
+from google_auth_oauthlib.flow import Flow
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
+if os.environ.get("RENDER"):
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 timeline_builder = TimelineBuilder()
-application_store = ApplicationStore(os.path.join(app.instance_path, "job_timeline.sqlite3"))
-app.config["SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "development-only-change-me")
+database_path = os.environ.get("APPLICATION_DATABASE_PATH", os.path.join(app.instance_path, "job_timeline.sqlite3"))
+application_store = ApplicationStore(database_path)
+secret_key = os.environ.get("FLASK_SECRET_KEY")
+if os.environ.get("RENDER") and not secret_key:
+    raise RuntimeError("Set FLASK_SECRET_KEY in the hosting service environment before starting the app.")
+app.config["SECRET_KEY"] = secret_key or "development-only-change-me"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RENDER") == "true" or os.environ.get("FLASK_ENV") == "production"
 
 
 @app.before_request
@@ -37,6 +48,11 @@ def inject_csrf_token():
 @app.route("/")
 def home():
     return render_template("index.html", today=datetime.now().strftime("%Y-%m-%d"), applications_count=len(application_store.list_applications()))
+
+
+@app.route("/healthz")
+def health_check():
+    return {"status": "ok"}, 200
 
 
 @app.route("/predict", methods=["POST"])
@@ -94,6 +110,11 @@ def calendar():
         application_id = application_store.create_application(application_label, timeline)
         result = CalendarGenerator().create_calendar(timeline)
         application_store.save_created_events(application_id, result["created_events"])
+        application_store.set_application_active(application_id, bool(result["created_events"]))
+    except GoogleCalendar.AuthorizationRequired:
+        session["pending_application_id"] = application_id
+        session["pending_application_action"] = "enable"
+        return redirect(url_for("oauth_start"))
     except (ValueError, OSError, RuntimeError) as exc:
         if "application_id" in locals():
             application_store.remove_application(application_id)
@@ -110,6 +131,90 @@ def calendar():
 @app.route("/applications")
 def applications():
     return render_template("applications.html", applications=application_store.list_applications(), applications_count=len(application_store.list_applications()))
+
+
+@app.route("/oauth/start")
+def oauth_start():
+    try:
+        client_config = GoogleCalendar.web_client_config()
+        if not client_config:
+            raise RuntimeError("Google Calendar web OAuth is not configured.")
+        flow = Flow.from_client_config(client_config, scopes=SCOPES)
+        flow.redirect_uri = url_for("oauth_callback", _external=True)
+        authorization_url, state = flow.authorization_url(access_type="offline", include_granted_scopes="true", prompt="consent")
+        session["oauth_state"] = state
+        return redirect(authorization_url)
+    except Exception as exc:
+        app.logger.exception("Could not start Google OAuth")
+        applications_data = application_store.list_applications()
+        return render_template("applications.html", applications=applications_data,
+            applications_count=len(applications_data), error=f"Could not start Google Calendar authorization: {exc}"), 503
+
+
+@app.route("/oauth/callback")
+def oauth_callback():
+    expected_state = session.pop("oauth_state", None)
+    returned_state = request.args.get("state", "")
+    if not expected_state or not hmac.compare_digest(expected_state, returned_state):
+        return "Google authorization could not be verified. Return to the app and try again.", 400
+    if request.args.get("error"):
+        applications_data = application_store.list_applications()
+        return render_template("applications.html", applications=applications_data,
+            applications_count=len(applications_data), error="Google Calendar access was not approved."), 400
+    try:
+        flow = Flow.from_client_config(GoogleCalendar.web_client_config(), scopes=SCOPES, state=expected_state)
+        flow.redirect_uri = url_for("oauth_callback", _external=True)
+        flow.fetch_token(authorization_response=request.url)
+        token_path = GoogleCalendar.token_path()
+        token_path.parent.mkdir(parents=True, exist_ok=True)
+        token_path.write_text(flow.credentials.to_json(), encoding="utf-8")
+
+        application_id = session.pop("pending_application_id", None)
+        action = session.pop("pending_application_action", "enable")
+        if not application_id:
+            return redirect(url_for("applications"))
+        calendar = GoogleCalendar()
+        created, failed = [], []
+        application = application_store.get_application(application_id)
+        if action == "disable":
+            for item in application["events"]:
+                if item["status"] != "active" or not item["google_event_id"]:
+                    continue
+                try:
+                    calendar.delete_event(item["google_event_id"])
+                    application_store.set_event_calendar(item["id"], None, "removed")
+                except HttpError as exc:
+                    if exc.resp.status == 404:
+                        application_store.set_event_calendar(item["id"], None, "removed")
+                    else:
+                        failed.append({"Event": item["title"], "error": str(exc)})
+                except Exception as exc:
+                    failed.append({"Event": item["title"], "error": str(exc)})
+        else:
+            for item in application["events"]:
+                if item["status"] == "active" and item["google_event_id"]:
+                    continue
+                try:
+                    event_id = calendar.create_event(item["title"], item["date"])
+                    application_store.set_event_calendar(item["id"], event_id, "active")
+                    created.append(item["title"])
+                except Exception as exc:
+                    failed.append({"Event": item["title"], "error": str(exc)})
+        application = application_store.get_application(application_id)
+        active = any(item["status"] == "active" for item in application["events"])
+        application_store.set_application_active(application_id, active)
+        if action == "disable":
+            applications_data = application_store.list_applications()
+            return render_template("applications.html", applications=applications_data,
+                applications_count=len(applications_data), error="Some events could not be removed." if failed else None,
+                notice=None if failed else f"Calendar rounds for {application['label']} were removed."), 502 if failed else 200
+        return render_template("success.html", created=created, failed=failed,
+            application_label=application["label"], applications_count=len(application_store.list_applications()))
+    except Exception as exc:
+        app.logger.exception("Google OAuth callback failed")
+        applications_data = application_store.list_applications()
+        return render_template("applications.html", applications=applications_data,
+            applications_count=len(applications_data), error=f"Google Calendar authorization did not finish: {exc}"), 502
 
 
 @app.route("/applications/<int:application_id>/toggle", methods=["POST"])
@@ -149,6 +254,10 @@ def toggle_application(application_id):
         current = application_store.get_application(application_id)
         any_active = any(item["status"] == "active" for item in current["events"])
         application_store.set_application_active(application_id, any_active if errors else enabled)
+    except GoogleCalendar.AuthorizationRequired:
+        session["pending_application_id"] = application_id
+        session["pending_application_action"] = "enable" if enabled else "disable"
+        return redirect(url_for("oauth_start"))
     except Exception as exc:
         app.logger.exception("Application calendar toggle failed")
         errors.append(str(exc))
@@ -160,4 +269,4 @@ def toggle_application(application_id):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "5000")), debug=os.environ.get("FLASK_DEBUG") == "1")
