@@ -13,6 +13,7 @@ class TimelineBuilder:
         ("Application", r"\bapplication\s+(?:submitted|received|date)\b|\bapply(?:ing)?\s+by\b"),
         ("Shortlisted", r"\bshortlist(?:ed|ing)?\b"),
         ("Online Assessment", r"\bonline\s+assessment\b"),
+        ("Technical Assessment", r"\btechnical\s+asses{0,2}ment\b"),
         ("Aptitude Test", r"\baptitude\s+(?:test|assessment)\b"),
         ("Coding Assessment", r"\bcoding\s+assessment\b"),
         ("Coding Test", r"\bcoding\s+test\b"),
@@ -20,9 +21,11 @@ class TimelineBuilder:
         ("Technical Round 1", r"\btechnical\s+(?:round|interview)\s*(?:1|one|i)\b"),
         ("Technical Round 2", r"\btechnical\s+(?:round|interview)\s*(?:2|two|ii)\b"),
         ("Technical Interview", r"\btechnical\s+interview\b|\btechnical\s+round\b"),
+        ("Final Round", r"\bfinal\s+(?:round|interview)\b|\bfinalist\s+interview\b"),
         ("Machine Coding", r"\bmachine\s+coding\b"),
         ("System Design", r"\bsystem\s+design\b"),
         ("Managerial Interview", r"\bmanagerial\s+(?:round|interview)\b|\bmanager\s+interview\b"),
+        ("HR Round", r"\bhr\s+round\b|\bhuman\s+resources\s+round\b"),
         ("HR Discussion", r"\bhr\s+discussion\b"),
         ("HR Interview", r"\bhr\s+(?:round|interview)\b|\bhuman\s+resources\s+interview\b"),
         ("Document Verification", r"\bdocument\s+verification\b"),
@@ -107,7 +110,9 @@ class TimelineBuilder:
             "RELATIVE_BASE": relative_base,
             "PREFER_DATES_FROM": "future",
             "DATE_ORDER": "DMY",
-            "STRICT_PARSING": True,
+            # Hiring messages commonly omit the year. Strict parsing rejects
+            # those otherwise useful dates such as "Monday 26 October".
+            "STRICT_PARSING": False,
         }) or []
         results = []
         for phrase, date in parsed:
