@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f5f7fb">
+<title>Review your timeline - Job Timeline Planner</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><script src="{{ url_for('static', filename='script.js') }}" defer></script></head>
+<body><div class="page-wrap"><header class="topbar"><a class="brand" href="/" aria-label="Job Timeline home"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><nav class="top-nav"><a class="top-link" href="/applications">My applications{% if applications_count %}<span class="nav-count">{{ applications_count }}</span>{% endif %}</a><a class="top-link" href="/">Start over</a></nav></header>
+<main class="app-shell review-shell">
+<nav class="steps" aria-label="Progress"><span class="step complete"><b>&#10003;</b> Add details</span><i></i><span class="step active"><b>2</b> Review timeline</span><i></i><span class="step"><b>3</b> Add to calendar</span></nav>
+<section class="review-header"><div><span class="eyebrow">YOUR RESULTS</span><h1>Review your timeline</h1><p>Check the dates and evidence. Make any edits before adding events to your calendar.</p></div><div class="result-count"><strong>{{ timeline|length }}</strong><span>dated stage{% if timeline|length != 1 %}s{% endif %} found</span></div></section>
+{% if error %}<p class="alert error" role="alert"><span class="alert-icon">!</span>{{ error }}</p>{% endif %}
+{% if timeline %}<form action="/calendar" method="POST" id="calendar-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<section class="application-label-field"><label for="application_label">Company or role name <span>Required to group and manage these calendar rounds later</span></label><input class="text-input" id="application_label" name="application_label" value="{{ application_label or '' }}" maxlength="120" placeholder="Example: Northstar - Data Analyst" required></section>
+<div class="event-list" id="event-list">{% for item in timeline %}<article class="event-card">
+<div class="event-marker"><span>{{ '%02d'|format(loop.index) }}</span><i></i></div>
+<div class="event-content">
+<div class="event-fields"><label>Hiring stage<input name="event" value="{{ item.Event }}" maxlength="120" required autocomplete="off"></label><label>Event date<input name="date" type="date" value="{{ item.Date|replace('-', '-') }}" data-date="{{ item.Date }}" required></label></div>
+<input type="hidden" name="evidence" value="{{ item.Evidence or '' }}"><input type="hidden" name="date_phrase" value="{{ item.DatePhrase or '' }}"><input type="hidden" name="date_source" value="{{ item.DateSource or '' }}"><input type="hidden" name="certainty" value="{{ item.Certainty or '' }}">
+<div class="evidence-row"><span class="certainty {% if item.NeedsReview %}review{% endif %}"><span class="badge-dot"></span>{{ item.Certainty or 'Manually edited' }}</span><p class="evidence"><strong>Source</strong><span>{{ item.Evidence or 'Evidence not recorded' }}</span>{% if item.DatePhrase %}<small>Date phrase: "{{ item.DatePhrase }}" - {{ item.DateSource }}</small>{% endif %}</p><button type="button" class="remove" aria-label="Remove {{ item.Event }}" title="Remove event">&#215;</button></div>
+</div></article>{% endfor %}</div>
+<div class="review-actions"><a class="button button-secondary" href="/">&#8592; Back to message</a><button class="button button-primary" type="submit"><span>Add events to Google Calendar</span><span class="button-arrow">&#8594;</span></button></div>
+</form>
+{% else %}<section class="empty-state"><span class="empty-icon">&#128269;</span><h2>No dated stages found</h2><p>Try pasting a message that mentions a hiring stage and a date. For example, "Coding assessment on 18 October."</p><a class="button button-primary" href="/">Try another message</a></section>{% endif %}
+<footer class="page-footer"><span>Review carefully before calendar export.</span><span>Relative dates are marked for review.</span></footer>
+</main></div></body></html>

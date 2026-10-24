@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f5f7fb">
+<title>My applications - Job Timeline Planner</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><script src="{{ url_for('static', filename='script.js') }}" defer></script></head>
+<body><div class="page-wrap"><header class="topbar"><a class="brand" href="/" aria-label="Job Timeline home"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><a class="top-link" href="/">+ New timeline</a></header>
+<main class="app-shell review-shell"><div class="dashboard-heading"><div><span class="eyebrow">YOUR TRACKER</span><h1>My applications</h1><p>Manage the interview rounds linked to each company or role.</p></div><div class="result-count"><strong>{{ applications|length }}</strong><span>application{% if applications|length != 1 %}s{% endif %}</span></div></div>
+{% if error %}<p class="alert error" role="alert"><span class="alert-icon">!</span>{{ error }}</p>{% endif %}
+{% if notice %}<p class="alert notice" role="status"><span class="notice-icon">&#10003;</span>{{ notice }}</p>{% endif %}
+{% if applications %}<div class="application-list">{% for application in applications %}<article class="application-card">
+<div class="application-card-header"><div class="application-identity"><span class="company-mark">{{ application.label[:1]|upper }}</span><div><h2>{{ application.label }}</h2><p>{{ application.events|length }} interview round{% if application.events|length != 1 %}s{% endif %} &middot; Added {{ application.created_at[:10] }}</p></div></div>
+<form class="application-toggle" action="{{ url_for('toggle_application', application_id=application.id) }}" method="POST" data-label="{{ application.label }}" data-active="{{ 'true' if application.active else 'false' }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="enabled" value="{{ 'false' if application.active else 'true' }}"><label class="switch" aria-label="{{ 'Remove rounds from' if application.active else 'Restore rounds to' }} Google Calendar for {{ application.label }}"><input type="checkbox" class="application-checkbox" {% if application.active %}checked{% endif %}><span class="switch-slider"></span></label><span class="toggle-label">{{ 'On calendar' if application.active else 'Removed' }}</span>
+</form></div>
+<ul class="application-events">{% for event in application.events %}<li><span class="event-status {% if event.status == 'active' %}is-active{% elif event.status == 'removed' %}is-removed{% else %}is-pending{% endif %}"></span><span class="round-name">{{ event.title }}</span><time datetime="{{ event.date }}">{{ event.date_display }}</time><span class="round-state">{% if event.status == 'active' %}On calendar{% elif event.status == 'removed' %}Removed{% else %}Not added{% endif %}</span></li>{% endfor %}</ul>
+</article>{% endfor %}</div>
+{% else %}<section class="empty-state"><span class="empty-icon">&#128203;</span><h2>No applications yet</h2><p>Build a hiring timeline and add its rounds to Google Calendar. Your applications will appear here so you can manage them together.</p><a class="button button-primary" href="/">Create a timeline <span class="button-arrow">&#8594;</span></a></section>{% endif %}
+<footer class="page-footer"><span>Each toggle manages only calendar events created by this app.</span><span>Application labels and event IDs are stored locally.</span></footer>
+</main></div></body></html>

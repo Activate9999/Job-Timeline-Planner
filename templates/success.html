@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f5f7fb">
+<title>Calendar result - Job Timeline Planner</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><div class="page-wrap"><header class="topbar"><a class="brand" href="/" aria-label="Job Timeline home"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><a class="top-link" href="/applications">My applications{% if applications_count %}<span class="nav-count">{{ applications_count }}</span>{% endif %}</a></header>
+<main class="app-shell result-shell"><nav class="steps" aria-label="Progress"><span class="step complete"><b>&#10003;</b> Add details</span><i></i><span class="step complete"><b>&#10003;</b> Review timeline</span><i></i><span class="step active"><b>3</b> Add to calendar</span></nav>
+<section class="result-card {% if failed %}has-errors{% endif %}"><div class="result-symbol">{% if failed and not created %}&#9888;{% elif failed %}!{% else %}&#10003;{% endif %}</div>
+{% if failed and created %}<span class="eyebrow">PARTIAL EXPORT</span><h1>Some events were added</h1><p class="result-lead">{{ created|length }} event{% if created|length != 1 %}s{% endif %} added to Google Calendar. {{ failed|length }} need attention.</p>
+{% elif failed %}<span class="eyebrow">EXPORT NEEDS ATTENTION</span><h1>Calendar export failed</h1><p class="result-lead">No events were added. Check the details below and try again.</p>
+{% else %}<span class="eyebrow">ALL SET</span><h1>Your timeline is on the calendar</h1><p class="result-lead">{{ created|length }} event{% if created|length != 1 %}s{% endif %} added successfully. You are ready for what comes next.</p>{% endif %}
+{% if created %}<div class="result-section"><h2>Added</h2><ul class="result-list">{% for event in created %}<li><span class="list-check">&#10003;</span>{{ event }}</li>{% endfor %}</ul></div>{% endif %}
+{% if failed %}<div class="result-section"><h2>Could not add</h2><ul class="result-list failed-list">{% for item in failed %}<li><span class="list-alert">!</span><span><strong>{{ item.Event }}</strong><small>{{ item.error }}</small></span></li>{% endfor %}</ul></div>{% endif %}
+<a class="button button-secondary result-button" href="/applications">View {{ application_label }} <span class="button-arrow">&#8594;</span></a><a class="button button-primary result-button" href="/">Plan another timeline</a></section>
+<footer class="page-footer"><span>Job Timeline Planner</span><span>You reviewed every event before export.</span></footer>
+</main></div></body></html>

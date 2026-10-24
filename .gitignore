@@ -1,0 +1,8 @@
+instance/
+credentials/token.json
+credentials/credentials.json
+evaluation/private/
+evaluation/*_private.csv
+__pycache__/
+*.py[cod]
+.DS_Store
