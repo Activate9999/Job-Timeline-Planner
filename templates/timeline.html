@@ -13,7 +13,7 @@
 <div class="event-list" id="event-list">{% for item in timeline %}<article class="event-card">
 <div class="event-marker"><span>{{ '%02d'|format(loop.index) }}</span><i></i></div>
 <div class="event-content">
-<div class="event-fields"><label>Hiring stage<input name="event" value="{{ item.Event }}" maxlength="120" required autocomplete="off"></label><label>Event date<input name="date" type="date" value="{{ item.Date|replace('-', '-') }}" data-date="{{ item.Date }}" required></label></div>
+<div class="event-fields"><label>Hiring stage<input name="event" value="{{ item.Event }}" maxlength="120" required autocomplete="off"></label><label>Event date<input name="date" type="date" value="{{ item.Date[6:10] }}-{{ item.Date[3:5] }}-{{ item.Date[0:2] }}" data-date="{{ item.Date }}" required></label></div>
 <input type="hidden" name="evidence" value="{{ item.Evidence or '' }}"><input type="hidden" name="date_phrase" value="{{ item.DatePhrase or '' }}"><input type="hidden" name="date_source" value="{{ item.DateSource or '' }}"><input type="hidden" name="certainty" value="{{ item.Certainty or '' }}">
 <div class="evidence-row"><span class="certainty {% if item.NeedsReview %}review{% endif %}"><span class="badge-dot"></span>{{ item.Certainty or 'Manually edited' }}</span><p class="evidence"><strong>Source</strong><span>{{ item.Evidence or 'Evidence not recorded' }}</span>{% if item.DatePhrase %}<small>Date phrase: "{{ item.DatePhrase }}" - {{ item.DateSource }}</small>{% endif %}</p><button type="button" class="remove" aria-label="Remove {{ item.Event }}" title="Remove event">&#215;</button></div>
 </div></article>{% endfor %}</div>
