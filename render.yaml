@@ -16,5 +16,3 @@ services:
         sync: false
       - key: GOOGLE_TOKEN_ENCRYPTION_KEY
         generateValue: true
-      - key: GOOGLE_OAUTH_CLIENT_CONFIG
-        sync: false
