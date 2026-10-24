@@ -122,8 +122,11 @@ class ApplicationStore:
         applications = []
         for row in rows:
             if not applications or applications[-1]["id"] != row["id"]:
+                created_at = row["created_at"]
+                if isinstance(created_at, datetime):
+                    created_at = created_at.isoformat()
                 applications.append({"id": row["id"], "label": row["label"], "active": bool(row["active"]),
-                                     "created_at": row["created_at"], "events": []})
+                                     "created_at": str(created_at), "events": []})
             if row["event_id"] is not None:
                 applications[-1]["events"].append({"id": row["event_id"], "title": row["title"],
                     "date": row["event_date"], "date_display": datetime.strptime(row["event_date"], "%Y-%m-%d").strftime("%d %b %Y"),

@@ -3,6 +3,7 @@ instance/
 .env.*
 credentials/token.json
 credentials/credentials.json
+client_secret_*.json
 evaluation/private/
 evaluation/*_private.csv
 __pycache__/
