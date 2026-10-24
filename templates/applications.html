@@ -2,7 +2,7 @@
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#f5f7fb">
 <title>My applications - Job Timeline Planner</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"><script src="{{ url_for('static', filename='script.js') }}" defer></script></head>
-<body><div class="page-wrap"><header class="topbar"><a class="brand" href="/" aria-label="Job Timeline home"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><a class="top-link" href="/">+ New timeline</a></header>
+<body><div class="page-wrap"><header class="topbar"><a class="brand" href="/" aria-label="Job Timeline home"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><nav class="top-nav"><a class="top-link" href="/">+ New timeline</a><form class="logout-form" method="POST" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="top-link logout-button" type="submit">Sign out</button></form></nav></header>
 <main class="app-shell review-shell"><div class="dashboard-heading"><div><span class="eyebrow">YOUR TRACKER</span><h1>My applications</h1><p>Manage the interview rounds linked to each company or role.</p></div><div class="result-count"><strong>{{ applications|length }}</strong><span>application{% if applications|length != 1 %}s{% endif %}</span></div></div>
 {% if error %}<p class="alert error" role="alert"><span class="alert-icon">!</span>{{ error }}</p>{% endif %}
 {% if notice %}<p class="alert notice" role="status"><span class="notice-icon">&#10003;</span>{{ notice }}</p>{% endif %}

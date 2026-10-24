@@ -21,7 +21,7 @@ When exporting a timeline, enter a company or role label. The **My applications*
 
 ## Deploy for free on Render
 
-The included `render.yaml` creates a Render free web service. The tracker and encrypted Google Calendar refresh token use PostgreSQL, so create a free Neon database and set its connection string as `DATABASE_URL` in Render. Render's free filesystem is temporary, so it must not be used for the live tracker database or token. Keep `GOOGLE_TOKEN_ENCRYPTION_KEY` stable after the first deployment; changing it makes the stored Google token unreadable and requires reconnecting Calendar.
+The included `render.yaml` creates a Render free web service. The tracker and encrypted Google Calendar refresh token use PostgreSQL, so create a free Neon database and set its connection string as `DATABASE_URL` in Render. Set a strong private `APP_ACCESS_PASSWORD` in Render before using the site; it protects the tracker and calendar actions. Render's free filesystem is temporary, so it must not be used for the live tracker database or token. Keep `GOOGLE_TOKEN_ENCRYPTION_KEY` stable after the first deployment; changing it makes the stored Google token unreadable and requires reconnecting Calendar.
 
 Free hosting has limits: the Render service sleeps after a period without traffic and can take a little time to wake up. Neon and Render also apply free-tier usage and resource limits. This is suitable for a personal project, but it is not an always-on service with guaranteed availability.
 

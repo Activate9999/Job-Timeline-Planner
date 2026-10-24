@@ -14,5 +14,7 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      - key: APP_ACCESS_PASSWORD
+        sync: false
       - key: GOOGLE_TOKEN_ENCRYPTION_KEY
         generateValue: true

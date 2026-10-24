@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f5f7fb">
+<title>Sign in - Job Timeline Planner</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="page-wrap">
+<header class="topbar"><a class="brand" href="/login" aria-label="Job Timeline Planner"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><span class="topbar-note">Private workspace</span></header>
+<main class="login-shell">
+<section class="form-card login-card" aria-labelledby="login-title">
+<div class="card-heading"><div><span class="eyebrow">WELCOME BACK</span><h1 id="login-title">Sign in to your planner</h1></div><span class="step-number" aria-hidden="true">&#128274;</span></div>
+<p class="login-copy">Enter your private access password to open your application tracker and calendar tools.</p>
+{% if error %}<p class="alert error" role="alert"><span class="alert-icon">!</span>{{ error }}</p>{% endif %}
+<form method="POST" action="{{ url_for('login') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+<input type="hidden" name="next" value="{{ next }}">
+<label for="password">Access password</label>
+<input class="text-input login-password" type="password" id="password" name="password" autocomplete="current-password" required autofocus>
+<button class="button button-primary full-button" type="submit">Continue <span class="button-arrow" aria-hidden="true">&#8594;</span></button>
+</form>
+<p class="privacy-note"><span aria-hidden="true">&#128274;</span> Your password is stored as a private Render environment variable.</p>
+</section>
+<footer class="page-footer"><span>Job Timeline Planner</span><span>Find the dates. Focus on what comes next.</span></footer>
+</main>
+</div>
+</body>
+</html>

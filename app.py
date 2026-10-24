@@ -3,7 +3,7 @@ import os
 import hmac
 import secrets
 
-from flask import Flask, abort, redirect, render_template, request, session, url_for
+from flask import Flask, abort, current_app, redirect, render_template, request, session, url_for
 
 from src.timeline_builder import TimelineBuilder
 from src.calendar_generator import CalendarGenerator
@@ -23,6 +23,7 @@ application_store = ApplicationStore(database_path)
 secret_key = os.environ.get("FLASK_SECRET_KEY")
 if os.environ.get("RENDER") and not secret_key:
     raise RuntimeError("Set FLASK_SECRET_KEY in the hosting service environment before starting the app.")
+access_password = os.environ.get("APP_ACCESS_PASSWORD")
 app.config["SECRET_KEY"] = secret_key or "development-only-change-me"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -38,6 +39,45 @@ def csrf_protection():
             abort(400, description="The form expired. Reload the page and try again.")
     if not token:
         session["csrf_token"] = secrets.token_urlsafe(32)
+
+
+@app.before_request
+def require_app_password():
+    if os.environ.get("RENDER") and not access_password and request.endpoint not in {"login", "health_check", "static"}:
+        abort(503, description="The site owner must set APP_ACCESS_PASSWORD in the hosting service environment.")
+    if not access_password or request.endpoint in {"login", "health_check", "static"}:
+        return None
+    if not session.get("authenticated"):
+        return redirect(url_for("login", next=request.full_path if request.query_string else request.path))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not access_password:
+        if os.environ.get("RENDER"):
+            return render_template("login.html", error="The site owner still needs to set APP_ACCESS_PASSWORD in Render.", next=""), 503
+        return redirect(url_for("home"))
+    if session.get("authenticated"):
+        return redirect(url_for("home"))
+    error = None
+    if request.method == "POST":
+        submitted = request.form.get("password", "")
+        if hmac.compare_digest(submitted, access_password):
+            session.clear()
+            session["authenticated"] = True
+            session["csrf_token"] = secrets.token_urlsafe(32)
+            destination = request.form.get("next", "")
+            if not destination.startswith("/") or destination.startswith("//"):
+                destination = url_for("home")
+            return redirect(destination)
+        error = "That password didn’t match. Please try again."
+    return render_template("login.html", error=error, next=request.args.get("next", ""))
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.context_processor

@@ -75,6 +75,19 @@ textarea:focus,input:focus{border-color:#7a97ff!important;box-shadow:0 0 0 3px #
 @media(max-width:390px){.page-wrap{padding:0 12px}.steps i{width:15px}.step{gap:5px;font-size:9px}.brand{font-size:13px}.topbar-note{font-size:10px}.review-header{gap:10px}.result-count{min-width:67px}.review-header h1{font-size:26px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 
+/* Private workspace sign-in */
+.login-shell{max-width:480px;margin:0 auto;padding:100px 0 34px}
+.login-card{padding:32px}
+.login-card .card-heading{margin-bottom:13px}
+.login-card h1{font:800 23px/1.2 Manrope,sans-serif;letter-spacing:-.7px;margin:0;color:#192a46}
+.login-copy{margin:0 0 24px;color:var(--muted);font-size:13px;line-height:1.65}
+.login-password{height:46px}
+.login-card .full-button{margin-top:18px}
+.logout-form{display:inline-flex;margin:0}
+.logout-button{font:inherit;cursor:pointer}
+.logout-button:hover{color:var(--blue-dark);text-decoration:underline}
+@media(max-width:700px){.login-shell{padding:65px 0 28px}.login-card{padding:24px 20px}}
+
 /* Application dashboard */
 .top-nav{display:flex;align-items:center;gap:18px}
 .nav-count{display:inline-grid;place-items:center;min-width:19px;height:19px;padding:0 5px;border-radius:99px;background:var(--blue-pale);font-size:10px}

@@ -9,7 +9,7 @@
 </head>
 <body>
 <div class="page-wrap">
-<header class="topbar"><a class="brand" href="/" aria-label="Job Timeline home"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><a class="top-link" href="/applications">My applications{% if applications_count %}<span class="nav-count">{{ applications_count }}</span>{% endif %}</a></header>
+<header class="topbar"><a class="brand" href="/" aria-label="Job Timeline home"><span class="brand-mark">JT</span><span>Job Timeline<span class="brand-light"> / Planner</span></span></a><nav class="top-nav"><a class="top-link" href="/applications">My applications{% if applications_count %}<span class="nav-count">{{ applications_count }}</span>{% endif %}</a><form class="logout-form" method="POST" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="top-link logout-button" type="submit">Sign out</button></form></nav></header>
 <main class="app-shell">
 <nav class="steps" aria-label="Progress"><span class="step active"><b>1</b> Add details</span><i></i><span class="step"><b>2</b> Review timeline</span><i></i><span class="step"><b>3</b> Add to calendar</span></nav>
 <section class="hero">
