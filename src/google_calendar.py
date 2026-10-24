@@ -2,6 +2,8 @@ from __future__ import print_function
 
 import json
 import os.path
+import base64
+import hashlib
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -31,8 +33,12 @@ class GoogleCalendar:
         token_path = Path(os.environ.get("GOOGLE_TOKEN_PATH", project_root / "credentials" / "token.json"))
         credentials_path = Path(os.environ.get("GOOGLE_CLIENT_SECRETS_FILE", project_root / "credentials" / "credentials.json"))
         hosted_client = os.environ.get("GOOGLE_OAUTH_CLIENT_CONFIG")
+        if os.environ.get("DATABASE_URL"):
+            token_json = self._load_database_token()
+            if token_json:
+                creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
 
-        if os.path.exists(token_path):
+        elif os.path.exists(token_path):
 
             creds = Credentials.from_authorized_user_file(
                 token_path,
@@ -62,10 +68,7 @@ class GoogleCalendar:
 
                 creds = self._authorize(credentials_path)
 
-            token_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(token_path, "w", encoding="utf-8") as token:
-
-                token.write(creds.to_json())
+            self.save_token(creds)
 
         service = build("calendar", "v3", credentials=creds)
 
@@ -85,6 +88,34 @@ class GoogleCalendar:
     def token_path():
         project_root = Path(__file__).resolve().parent.parent
         return Path(os.environ.get("GOOGLE_TOKEN_PATH", project_root / "credentials" / "token.json"))
+
+    @staticmethod
+    def _fernet():
+        from cryptography.fernet import Fernet
+        secret = os.environ.get("GOOGLE_TOKEN_ENCRYPTION_KEY")
+        if not secret:
+            raise RuntimeError("Set GOOGLE_TOKEN_ENCRYPTION_KEY to protect the Google Calendar token.")
+        key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode("utf-8")).digest())
+        return Fernet(key)
+
+    @classmethod
+    def _load_database_token(cls):
+        from src.application_store import ApplicationStore
+        encrypted = ApplicationStore(cls.token_path()).get_secret("google_calendar_token")
+        if not encrypted:
+            return None
+        return cls._fernet().decrypt(encrypted.encode("ascii")).decode("utf-8")
+
+    @classmethod
+    def save_token(cls, credentials):
+        if os.environ.get("DATABASE_URL"):
+            from src.application_store import ApplicationStore
+            encrypted = cls._fernet().encrypt(credentials.to_json().encode("utf-8")).decode("ascii")
+            ApplicationStore(cls.token_path()).set_secret("google_calendar_token", encrypted)
+        else:
+            token_path = cls.token_path()
+            token_path.parent.mkdir(parents=True, exist_ok=True)
+            token_path.write_text(credentials.to_json(), encoding="utf-8")
 
     def create_event(self, title, date):
 

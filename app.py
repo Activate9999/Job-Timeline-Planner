@@ -165,9 +165,7 @@ def oauth_callback():
         flow = Flow.from_client_config(GoogleCalendar.web_client_config(), scopes=SCOPES, state=expected_state)
         flow.redirect_uri = url_for("oauth_callback", _external=True)
         flow.fetch_token(authorization_response=request.url)
-        token_path = GoogleCalendar.token_path()
-        token_path.parent.mkdir(parents=True, exist_ok=True)
-        token_path.write_text(flow.credentials.to_json(), encoding="utf-8")
+        GoogleCalendar.save_token(flow.credentials)
 
         application_id = session.pop("pending_application_id", None)
         action = session.pop("pending_application_action", "enable")

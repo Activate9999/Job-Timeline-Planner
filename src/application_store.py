@@ -1,6 +1,7 @@
 """Local SQLite storage for applications and their Google Calendar events."""
 
 import sqlite3
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -8,16 +9,45 @@ from datetime import datetime
 class ApplicationStore:
     def __init__(self, database_path):
         self.database_path = Path(database_path)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        self.database_url = os.environ.get("DATABASE_URL")
+        if not self.database_url:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
     def _connect(self):
+        if self.database_url:
+            import psycopg
+            from psycopg.rows import dict_row
+            return psycopg.connect(self.database_url, row_factory=dict_row)
         connection = sqlite3.connect(self.database_path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
     def _initialize(self):
+        if self.database_url:
+            with self._connect() as connection:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS applications (
+                        id BIGSERIAL PRIMARY KEY, label TEXT NOT NULL,
+                        active BOOLEAN NOT NULL DEFAULT TRUE,
+                        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS application_events (
+                        id BIGSERIAL PRIMARY KEY,
+                        application_id BIGINT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+                        title TEXT NOT NULL, event_date TEXT NOT NULL,
+                        google_event_id TEXT, status TEXT NOT NULL DEFAULT 'pending'
+                    )
+                """)
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS app_secrets (
+                        name TEXT PRIMARY KEY, value TEXT NOT NULL
+                    )
+                """)
+            return
         with self._connect() as connection:
             connection.executescript("""
                 CREATE TABLE IF NOT EXISTS applications (
@@ -34,14 +64,24 @@ class ApplicationStore:
                     google_event_id TEXT,
                     status TEXT NOT NULL DEFAULT 'pending'
                 );
+                CREATE TABLE IF NOT EXISTS app_secrets (
+                    name TEXT PRIMARY KEY, value TEXT NOT NULL
+                );
             """)
+
+    def _sql(self, sql):
+        return sql.replace("?", "%s") if self.database_url else sql
 
     def create_application(self, label, timeline):
         with self._connect() as connection:
-            cursor = connection.execute("INSERT INTO applications(label, active) VALUES (?, 0)", (label,))
-            application_id = cursor.lastrowid
+            if self.database_url:
+                row = connection.execute("INSERT INTO applications(label, active) VALUES (%s, FALSE) RETURNING id", (label,)).fetchone()
+                application_id = row["id"]
+            else:
+                cursor = connection.execute("INSERT INTO applications(label, active) VALUES (?, 0)", (label,))
+                application_id = cursor.lastrowid
             connection.executemany(
-                "INSERT INTO application_events(application_id, title, event_date) VALUES (?, ?, ?)",
+                self._sql("INSERT INTO application_events(application_id, title, event_date) VALUES (?, ?, ?)"),
                 [(application_id, item["Event"], datetime.strptime(item["Date"], "%d-%m-%Y").strftime("%Y-%m-%d")) for item in timeline],
             )
         return application_id
@@ -50,18 +90,17 @@ class ApplicationStore:
         with self._connect() as connection:
             for item in created_events:
                 event_date = datetime.strptime(item["date"], "%d-%m-%Y").strftime("%Y-%m-%d")
-                row = connection.execute(
+                row = connection.execute(self._sql(
                     """SELECT id FROM application_events WHERE application_id = ? AND title = ?
                        AND event_date = ? AND status = 'pending' ORDER BY id LIMIT 1""",
-                    (application_id, item["title"], event_date),
-                ).fetchone()
+                ), (application_id, item["title"], event_date)).fetchone()
                 if row:
-                    connection.execute("UPDATE application_events SET google_event_id = ?, status = 'active' WHERE id = ?",
-                                       (item["id"], row["id"]))
+                    connection.execute(self._sql("UPDATE application_events SET google_event_id = ?, status = 'active' WHERE id = ?"),
+                                        (item["id"], row["id"]))
 
     def remove_application(self, application_id):
         with self._connect() as connection:
-            connection.execute("DELETE FROM applications WHERE id = ?", (application_id,))
+            connection.execute(self._sql("DELETE FROM applications WHERE id = ?"), (application_id,))
 
     def list_applications(self):
         with self._connect() as connection:
@@ -89,26 +128,36 @@ class ApplicationStore:
 
     def get_pending_events(self, application_id):
         with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT id, title, event_date FROM application_events WHERE application_id = ? AND status = 'pending' ORDER BY event_date, id",
+            rows = connection.execute(self._sql(
+                "SELECT id, title, event_date FROM application_events WHERE application_id = ? AND status = 'pending' ORDER BY event_date, id"),
                 (application_id,),
             ).fetchall()
         return [dict(row) for row in rows]
 
     def set_event_status(self, event_id, status):
         with self._connect() as connection:
-            connection.execute("UPDATE application_events SET status = ? WHERE id = ?", (status, event_id))
+            connection.execute(self._sql("UPDATE application_events SET status = ? WHERE id = ?"), (status, event_id))
 
     def set_event_calendar(self, event_id, google_event_id, status):
         with self._connect() as connection:
-            connection.execute("UPDATE application_events SET google_event_id = ?, status = ? WHERE id = ?",
+            connection.execute(self._sql("UPDATE application_events SET google_event_id = ?, status = ? WHERE id = ?"),
                                (google_event_id, status, event_id))
 
     def set_application_active(self, application_id, active):
         with self._connect() as connection:
-            connection.execute("UPDATE applications SET active = ? WHERE id = ?", (int(active), application_id))
+            connection.execute(self._sql("UPDATE applications SET active = ? WHERE id = ?"), (bool(active) if self.database_url else int(active), application_id))
 
     def get_event_by_id(self, event_id):
         with self._connect() as connection:
-            row = connection.execute("SELECT * FROM application_events WHERE id = ?", (event_id,)).fetchone()
+            row = connection.execute(self._sql("SELECT * FROM application_events WHERE id = ?"), (event_id,)).fetchone()
         return dict(row) if row else None
+
+    def get_secret(self, name):
+        with self._connect() as connection:
+            row = connection.execute(self._sql("SELECT value FROM app_secrets WHERE name = ?"), (name,)).fetchone()
+        return row["value"] if row else None
+
+    def set_secret(self, name, value):
+        with self._connect() as connection:
+            connection.execute(self._sql("""INSERT INTO app_secrets(name, value) VALUES (?, ?)
+                ON CONFLICT(name) DO UPDATE SET value = excluded.value"""), (name, value))
